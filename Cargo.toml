@@ -1,0 +1,17 @@
+[workspace.package]
+version = "0.1.0"
+authors = ["Jens"]
+edition = "2021"
+description = "A cell-based engine for particle simulations, e.g. the classic falling sand"
+repository = "https://github.com/jens-hj/cellengine"
+license = "MIT"
+keywords = ["cell", "engine", "simulation", "game", "sand"]
+categories = ["game-engines", "simulation", "falling-sand", "sand"]
+
+[workspace]
+members = ["cells"]
+
+resolver = "2"
+
+[workspace.dependencies]
+nannou = "0.19.0"
