@@ -1,0 +1,14 @@
+[package]
+name = "bevy_cells"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+bevy.workspace = true
+cell_engine = { path = "../cell_engine" }
