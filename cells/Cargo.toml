@@ -10,4 +10,6 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-nannou = { workspace = true }
+nannou.workspace = true
+rayon.workspace = true
+rand.workspace = true
