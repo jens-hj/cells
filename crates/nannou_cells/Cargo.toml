@@ -1,5 +1,5 @@
 [package]
-name = "cells"
+name = "nannou_cells"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,5 +11,4 @@ categories.workspace = true
 
 [dependencies]
 nannou.workspace = true
-rayon.workspace = true
 rand.workspace = true

@@ -255,15 +255,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cells"
-version = "0.1.0"
-dependencies = [
- "nannou",
- "rand 0.9.0",
- "rayon",
-]
-
-[[package]]
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1196,6 +1187,14 @@ dependencies = [
  "walkdir",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "nannou_cells"
+version = "0.1.0"
+dependencies = [
+ "nannou",
+ "rand 0.9.0",
 ]
 
 [[package]]
