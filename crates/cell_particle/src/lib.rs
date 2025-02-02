@@ -1,2 +1,3 @@
-mod particles;
-mod rules;
+pub mod particle;
+pub mod rule;
+pub mod grid;

@@ -11,3 +11,8 @@ categories.workspace = true
 
 [dependencies]
 bevy.workspace = true
+bevy_catppuccin.workspace = true
+cell_particle.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
+rand.workspace = true

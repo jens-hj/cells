@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_catppuccin::{CatppuccinTheme, Flavor};
 
 use crate::systems::*;
 
@@ -6,7 +7,16 @@ pub struct CellEnginePlugin;
 
 impl Plugin for CellEnginePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup);
-        app.add_systems(Update, update);
+        // Set up the theme
+        let theme = CatppuccinTheme {
+            flavor: Flavor::MOCHA,
+        };
+        app.insert_resource(theme);
+        app.insert_resource(ClearColor(theme.flavor.base));
+
+        // Set up the systems
+        app.add_systems(Startup, (setup_environment, setup_view).chain());
+        app.add_systems(FixedUpdate, grid_update);
+        app.add_systems(Update, view_update);
     }
 }

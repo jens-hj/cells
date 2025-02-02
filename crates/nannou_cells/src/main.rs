@@ -33,6 +33,9 @@ impl ParticleRule for SandRule {
         width: usize,
         height: usize,
     ) -> Option<(usize, usize)> {
+        // Ignore height
+        let _ = height;
+
         if y == 0 {
             return None;
         }
@@ -79,6 +82,9 @@ impl ParticleRule for WaterRule {
         width: usize,
         height: usize,
     ) -> Option<(usize, usize)> {
+        // Ignore height
+        let _ = height;
+
         if y == 0 {
             return None;
         }
@@ -144,6 +150,13 @@ impl ParticleRule for StoneRule {
         width: usize,
         height: usize,
     ) -> Option<(usize, usize)> {
+        // Ignore all arguments
+        let _ = x;
+        let _ = y;
+        let _ = grid;
+        let _ = width;
+        let _ = height;
+
         // Stone doesn't move
         None
     }
