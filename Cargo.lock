@@ -988,6 +988,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_pointer_to_world"
+version = "0.1.0"
+source = "git+https://github.com/jens-hj/bevy_pointer_to_world.git?rev=b385d01ca25d9654cd241c725b31eeb791ef5735#b385d01ca25d9654cd241c725b31eeb791ef5735"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_ptr"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1569,6 +1577,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_catppuccin",
+ "bevy_pointer_to_world",
  "cell_particle",
  "rand 0.9.0",
  "strum",

@@ -27,6 +27,7 @@ percentage = { path = "crates/percentage" }
 
 # Own dependencies
 bevy_catppuccin = { git = "https://github.com/jens-hj/bevy_catppuccin.git", rev = "df2255968c7f357a8201415e5b90c94531cceee9" }
+bevy_pointer_to_world = { git = "https://github.com/jens-hj/bevy_pointer_to_world.git", rev = "b385d01ca25d9654cd241c725b31eeb791ef5735" }
 
 # Third party dependencies
 nannou = "0.19.0"

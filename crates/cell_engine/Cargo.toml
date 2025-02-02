@@ -16,3 +16,4 @@ cell_particle.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 rand.workspace = true
+bevy_pointer_to_world.workspace = true

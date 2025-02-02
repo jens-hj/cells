@@ -9,11 +9,11 @@ use strum::IntoEnumIterator;
 
 /// Bevy [`Component`] for a cell, which optionally contains a [`Particle`]
 #[derive(Component, Debug, Clone)]
-pub struct Cell {
+pub struct ParticleCell {
     pub content: Option<particle::Particle>,
 }
 
-impl Cell {
+impl ParticleCell {
     pub fn color(&self, flavor: &Flavor) -> Color {
         match &self.content {
             Some(particle) => match particle.kind {
@@ -26,9 +26,9 @@ impl Cell {
     }
 }
 
-impl Default for Cell {
+impl Default for ParticleCell {
     fn default() -> Self {
-        Cell { content: None }
+        ParticleCell { content: None }
     }
 }
 
@@ -39,12 +39,12 @@ pub struct CellWorld {
     /// Physical resolution of the world in pixels per cell. Each cell is a square.
     pub resolution: u32,
     /// The data of the world itself, grid of cells
-    pub grid: Grid<Cell>,
+    pub grid: Grid<ParticleCell>,
 }
 
 impl CellWorld {
     pub fn new(width: usize, height: usize) -> Self {
-        let grid = Grid::new(vec![vec![Cell::default(); width]; height]).unwrap();
+        let grid = Grid::new(vec![vec![ParticleCell::default(); width]; height]).unwrap();
         CellWorld {
             resolution: 10,
             grid,
@@ -53,6 +53,13 @@ impl CellWorld {
 
     pub fn with_resolution(mut self, resolution: u32) -> Self {
         self.resolution = resolution;
+        self
+    }
+
+    pub fn with_fill(mut self, particle_kind: ParticleKind) -> Self {
+        for cell in self.grid.iter_mut() {
+            cell.content = Some(particle::Particle::new(particle_kind.clone()));
+        }
         self
     }
 
