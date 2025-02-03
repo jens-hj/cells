@@ -4,10 +4,12 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use bevy_catppuccin::CatppuccinTheme;
 use bevy_pointer_to_world::{PointerToWorldCamera, PointerWorldPosition};
-use cell_particle::grid::Dimensions;
+use cell_particle::grid::{Dimensions, Grid};
 use cell_particle::particle::{Particle, ParticleKind};
+use cell_particle::rule::{Input, Output, Rule};
+use percentage::Percentage;
 
-use crate::{CellWorld, ParticleCell, View, WorldTexture};
+use crate::{CellRule, CellWorld, ParticleCell, View, WorldTexture};
 
 /// Bevy [`Startup`] system to setup the environment
 pub fn setup_environment(mut commands: Commands, theme: Res<CatppuccinTheme>) {
@@ -22,7 +24,22 @@ pub fn setup_environment(mut commands: Commands, theme: Res<CatppuccinTheme>) {
     ));
 
     // World
-    commands.spawn(CellWorld::new(126, 70).with_fill(ParticleKind::Stone));
+    commands.spawn(CellWorld::new(126, 70));
+}
+
+/// Bevy [`Startup`] system to setup the rules of the world
+pub fn setup_rules(mut commands: Commands) {
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![vec![Some(ParticleKind::Sand)], vec![None]]).unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![vec![None], vec![Some(ParticleKind::Sand)]]).unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+    });
 }
 
 /// Bevy [`Startup`] system to setup the visualisation of the world
@@ -77,8 +94,14 @@ pub fn setup_view(
 }
 
 /// Bevy [`FixedUpdate`] system to update the grid
-pub fn grid_update(_time: Res<Time<Fixed>>) {
-    // println!("Time: {}", time.elapsed_secs());
+pub fn grid_update(cell_rules: Query<&CellRule>, mut grid: Query<&mut CellWorld>) {
+    let Ok(mut cell_world) = grid.get_single_mut() else {
+        warn!("No cell world found");
+        return;
+    };
+
+    let rules: Vec<_> = cell_rules.iter().map(|r| r.rule.clone()).collect();
+    cell_world.update(&rules);
 }
 
 /// Bevy [`Update`] system to update the visualisation of the world
@@ -126,9 +149,6 @@ pub fn mouse_input(
     mut cell_worlds: Query<&mut CellWorld>,
 ) {
     if mouse_button_input.pressed(MouseButton::Left) {
-        // also get the position of the mouse
-        info!("Left mouse button pressed at {}", *pointer_world_position);
-
         // convert to grid position
         let Ok(mut cell_world) = cell_worlds.get_single_mut() else {
             return;
@@ -138,13 +158,14 @@ pub fn mouse_input(
             pointer_world_position.0 / cell_world.resolution as f32 * Vec2::new(1.0, -1.0);
         grid_position.x += cell_world.grid.dimensions().width as f32 / 2.0;
         grid_position.y += cell_world.grid.dimensions().height as f32 / 2.0;
-        info!("Grid position: {:?}", grid_position);
 
         // set the cell to red
-        let cell = cell_world
+        let Ok(cell) = cell_world
             .grid
             .get_mut(grid_position.x as usize, grid_position.y as usize)
-            .unwrap();
+        else {
+            return;
+        };
 
         *cell = ParticleCell {
             content: Some(Particle::new(ParticleKind::Sand)),

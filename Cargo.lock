@@ -1579,6 +1579,7 @@ dependencies = [
  "bevy_catppuccin",
  "bevy_pointer_to_world",
  "cell_particle",
+ "percentage",
  "rand 0.9.0",
  "strum",
  "strum_macros",

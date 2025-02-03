@@ -2,24 +2,34 @@ use bevy::prelude::*;
 use bevy_catppuccin::*;
 use cell_particle::{
     grid::Grid,
-    particle::{self, ParticleKind},
+    particle::{self, Particle, ParticleKind},
+    rule::Rule,
 };
-use rand::Rng;
+use rand::{
+    distr::{weighted::WeightedIndex, Distribution},
+    Rng,
+};
 use strum::IntoEnumIterator;
 
-/// Bevy [`Component`] for a cell, which optionally contains a [`Particle`]
+/// Bevy [`Component`] for a cellular automaton rule
 #[derive(Component, Debug, Clone)]
+pub struct CellRule {
+    pub rule: Rule<Option<ParticleKind>>,
+}
+
+/// Wrapper cell for [`Particle`], which optionally contains a [`Particle`], and can tell you its color
+#[derive(Debug, Clone)]
 pub struct ParticleCell {
-    pub content: Option<particle::Particle>,
+    pub content: Option<Particle>,
 }
 
 impl ParticleCell {
     pub fn color(&self, flavor: &Flavor) -> Color {
         match &self.content {
             Some(particle) => match particle.kind {
-                particle::ParticleKind::Sand => flavor.yellow,
-                particle::ParticleKind::Water => flavor.blue,
-                particle::ParticleKind::Stone => flavor.surface2,
+                ParticleKind::Sand => flavor.yellow,
+                ParticleKind::Water => flavor.blue,
+                ParticleKind::Stone => flavor.surface2,
             },
             None => Color::NONE,
         }
@@ -71,6 +81,60 @@ impl CellWorld {
             cell.content = Some(particle::Particle::new(particle_kind));
         }
         self
+    }
+
+    pub fn update(&mut self, rules: &Vec<Rule<Option<ParticleKind>>>) {
+        // update the grid for each rule
+        for rule in rules {
+            // loop over windows of the grid in the rule's width/height
+            let rule_dimensions = rule.dimensions();
+
+            // Create a grid of particle kinds from the cells
+            let particle_kind_grid: Grid<Option<ParticleKind>> = self
+                .grid
+                .iter()
+                .map(|cell| cell.content.as_ref().map(|p| p.kind.clone()))
+                .collect::<Vec<_>>()
+                .chunks(self.grid.dimensions().width)
+                .map(|chunk| chunk.to_vec())
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap();
+
+            // Iterate over windows and check rule matches
+            for window in particle_kind_grid.windowed(rule_dimensions) {
+                if rule.matches(&window.grid) {
+                    // Weighted choice of output grid, weighted by each output's probability in rule.output[i].probability
+                    let weighted_index =
+                        WeightedIndex::new(rule.output.iter().map(|o| o.probability.value()))
+                            .unwrap();
+
+                    let chosen_output =
+                        rule.output[weighted_index.sample(&mut rand::rng())].clone();
+
+                    // make output grid into a grid of particle cells
+                    let output_grid: Grid<ParticleCell> = chosen_output
+                        .grid
+                        .iter()
+                        .map(|cell| ParticleCell {
+                            content: cell.clone().map(|kind| particle::Particle::new(kind)),
+                        })
+                        .collect::<Vec<_>>()
+                        .chunks(chosen_output.grid.dimensions().width)
+                        .map(|chunk| chunk.to_vec())
+                        .collect::<Vec<_>>()
+                        .try_into()
+                        .unwrap();
+
+                    // Apply rule output here
+                    self.grid
+                        .set_subgrid(window.x, window.y, output_grid)
+                        .expect(
+                        "Output of rule should not be bigger than the grid it is being applied to",
+                    );
+                }
+            }
+        }
     }
 }
 

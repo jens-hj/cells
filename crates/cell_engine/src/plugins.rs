@@ -19,7 +19,10 @@ impl Plugin for CellEnginePlugin {
         app.add_plugins(PointerToWorldPlugin);
 
         // Set up the systems
-        app.add_systems(Startup, (setup_environment, setup_view).chain());
+        app.add_systems(
+            Startup,
+            ((setup_environment, setup_view).chain(), setup_rules),
+        );
         app.add_systems(FixedUpdate, grid_update);
         app.add_systems(Update, (view_update, mouse_input));
     }

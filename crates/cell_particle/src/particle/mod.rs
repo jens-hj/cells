@@ -8,7 +8,7 @@ pub use state::ParticleState;
 pub struct Particle {
     pub kind: ParticleKind,
     pub state: ParticleState,
-}       
+}
 
 impl Particle {
     pub fn new(kind: ParticleKind) -> Self {
@@ -24,6 +24,12 @@ impl PartialEq for Particle {
 }
 
 impl Eq for Particle {}
+
+impl std::fmt::Display for Particle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind)
+    }
+}
 
 #[cfg(test)]
 mod tests {
