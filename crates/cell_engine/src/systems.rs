@@ -9,7 +9,7 @@ use cell_particle::particle::{Particle, ParticleKind};
 use cell_particle::rule::{Input, Output, Rule};
 use percentage::Percentage;
 
-use crate::{CellRule, CellWorld, ParticleCell, View, WorldTexture};
+use crate::{CellRule, CellWorld, Occupancy::*, ParticleCell, View, WorldTexture};
 
 /// Bevy [`Startup`] system to setup the environment
 pub fn setup_environment(mut commands: Commands, theme: Res<CatppuccinTheme>) {
@@ -32,10 +32,105 @@ pub fn setup_rules(mut commands: Commands) {
     commands.spawn(CellRule {
         rule: Rule {
             input: Input {
-                grid: Grid::new(vec![vec![Some(ParticleKind::Sand)], vec![None]]).unwrap(),
+                grid: Grid::new(vec![vec![Occupied(ParticleKind::Sand)], vec![Empty]]).unwrap(),
             },
             output: vec![Output {
-                grid: Grid::new(vec![vec![None], vec![Some(ParticleKind::Sand)]]).unwrap(),
+                grid: Grid::new(vec![vec![Empty], vec![Occupied(ParticleKind::Sand)]]).unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+    });
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        OccupiedOrEmpty,
+                        Occupied(ParticleKind::Sand),
+                        OccupiedOrEmpty,
+                    ],
+                    vec![Empty, OccupiedAny, Empty],
+                ])
+                .unwrap(),
+            },
+            output: vec![
+                Output {
+                    grid: Grid::new(vec![
+                        vec![Empty, Empty, Empty],
+                        vec![
+                            Occupied(ParticleKind::Sand),
+                            Occupied(ParticleKind::Sand),
+                            Empty,
+                        ],
+                    ])
+                    .unwrap(),
+                    probability: Percentage::new(0.5),
+                },
+                Output {
+                    grid: Grid::new(vec![
+                        vec![Empty, Empty, Empty],
+                        vec![
+                            Empty,
+                            Occupied(ParticleKind::Sand),
+                            Occupied(ParticleKind::Sand),
+                        ],
+                    ])
+                    .unwrap(),
+                    probability: Percentage::new(0.5),
+                },
+            ],
+        },
+    });
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        OccupiedOrEmpty,
+                        Occupied(ParticleKind::Sand),
+                        OccupiedOrEmpty,
+                    ],
+                    vec![OccupiedAny, OccupiedAny, Empty],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Empty, Empty, Empty],
+                    vec![
+                        Empty,
+                        Occupied(ParticleKind::Sand),
+                        Occupied(ParticleKind::Sand),
+                    ],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+    });
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        OccupiedOrEmpty,
+                        Occupied(ParticleKind::Sand),
+                        OccupiedOrEmpty,
+                    ],
+                    vec![Empty, OccupiedAny, OccupiedAny],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Empty, Empty, Empty],
+                    vec![
+                        Occupied(ParticleKind::Sand),
+                        Occupied(ParticleKind::Sand),
+                        Empty,
+                    ],
+                ])
+                .unwrap(),
                 probability: Percentage::new(1.0),
             }],
         },
@@ -168,7 +263,7 @@ pub fn mouse_input(
         };
 
         *cell = ParticleCell {
-            content: Some(Particle::new(ParticleKind::Sand)),
+            content: Occupied(Particle::new(ParticleKind::Sand)),
         }
     }
 }
