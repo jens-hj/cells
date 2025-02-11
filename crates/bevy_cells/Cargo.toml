@@ -11,4 +11,7 @@ categories.workspace = true
 
 [dependencies]
 bevy.workspace = true
-cell_engine = { path = "../cell_engine" }
+cell_engine.workspace = true
+
+[features]
+debug = ["cell_engine/debug"]

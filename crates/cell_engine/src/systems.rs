@@ -40,6 +40,36 @@ pub fn setup_rules(mut commands: Commands) {
             }],
         },
     });
+
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![None, Some(ParticleKind::Sand), None],
+                    vec![None, Some(ParticleKind::Sand), None],
+                ])
+                .unwrap(),
+            },
+            output: vec![
+                Output {
+                    grid: Grid::new(vec![
+                        vec![None, None, None],
+                        vec![None, Some(ParticleKind::Sand), Some(ParticleKind::Sand)],
+                    ])
+                    .unwrap(),
+                    probability: Percentage::new(0.5),
+                },
+                Output {
+                    grid: Grid::new(vec![
+                        vec![None, None, None],
+                        vec![Some(ParticleKind::Sand), Some(ParticleKind::Sand), None],
+                    ])
+                    .unwrap(),
+                    probability: Percentage::new(0.5),
+                },
+            ],
+        },
+    });
 }
 
 /// Bevy [`Startup`] system to setup the visualisation of the world
@@ -149,7 +179,6 @@ pub fn mouse_input(
     mut cell_worlds: Query<&mut CellWorld>,
 ) {
     if mouse_button_input.pressed(MouseButton::Left) {
-        // convert to grid position
         let Ok(mut cell_world) = cell_worlds.get_single_mut() else {
             return;
         };
@@ -159,16 +188,45 @@ pub fn mouse_input(
         grid_position.x += cell_world.grid.dimensions().width as f32 / 2.0;
         grid_position.y += cell_world.grid.dimensions().height as f32 / 2.0;
 
-        // set the cell to red
-        let Ok(cell) = cell_world
-            .grid
-            .get_mut(grid_position.x as usize, grid_position.y as usize)
-        else {
-            return;
-        };
+        let x = grid_position.x as usize;
+        let y = grid_position.y as usize;
 
-        *cell = ParticleCell {
-            content: Some(Particle::new(ParticleKind::Sand)),
+        // set the cell
+        if let Ok(cell) = cell_world.grid.get_mut(x, y) {
+            *cell = ParticleCell {
+                content: Some(Particle::new(ParticleKind::Sand)),
+            };
+
+            // Mark the cell and its neighbors as active
+            for dy in y.saturating_sub(1)..=(y + 1) {
+                for dx in x.saturating_sub(1)..=(x + 1) {
+                    cell_world.active_cells.mark_active(dx, dy);
+                }
+            }
+        }
+    }
+}
+
+/// Bevy [`Update`] system to draw gizmos outlining the active cells
+#[cfg(feature = "debug")]
+pub fn draw_active_cells(
+    mut gizmos: Gizmos,
+    cell_worlds: Query<&CellWorld>,
+    theme: Res<CatppuccinTheme>,
+) {
+    for cell_world in cell_worlds.iter() {
+        for (x, y) in cell_world.active_cells.cells.iter() {
+            gizmos.rect_2d(
+                Vec2::new(
+                    (*x as f32 - cell_world.grid.dimensions().width as f32 / 2.0 + 0.5)
+                        * cell_world.resolution as f32,
+                    (*y as f32 - cell_world.grid.dimensions().height as f32 / 2.0 + 0.5)
+                        * cell_world.resolution as f32
+                        * -1.0,
+                ),
+                Vec2::new(cell_world.resolution as f32, cell_world.resolution as f32),
+                theme.flavor.red,
+            );
         }
     }
 }

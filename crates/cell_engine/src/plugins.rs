@@ -25,5 +25,10 @@ impl Plugin for CellEnginePlugin {
         );
         app.add_systems(FixedUpdate, grid_update);
         app.add_systems(Update, (view_update, mouse_input));
+
+        #[cfg(feature = "debug")]
+        {
+            app.add_systems(Update, draw_active_cells);
+        }
     }
 }
