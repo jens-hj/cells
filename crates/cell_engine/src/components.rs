@@ -136,25 +136,22 @@ impl CellWorld {
 
         // Process rules and track which cells were affected
         for &(x, y) in &cells_to_check {
-            let min_x = x.saturating_sub(1);
-            let min_y = y.saturating_sub(1);
-            let max_x = (x + 2).min(self.grid.dimensions().width);
-            let max_y = (y + 2).min(self.grid.dimensions().height);
-
-            let mut any_rule_applied = false;
-
             for rule in rules {
                 let rule_dims = rule.dimensions();
-                let window_width = rule_dims.width;
-                let window_height = rule_dims.height;
 
-                if min_x + window_width > max_x || min_y + window_height > max_y {
+                // Center the rule window on the particle
+                let rule_x = x.saturating_sub(rule_dims.width / 2);
+                let rule_y = y.saturating_sub(rule_dims.height / 2);
+
+                if rule_x + rule_dims.width > self.grid.dimensions().width
+                    || rule_y + rule_dims.height > self.grid.dimensions().height
+                {
                     continue;
                 }
 
-                if let Ok(window) = self
-                    .grid
-                    .get_subgrid(min_x, min_y, window_width, window_height)
+                if let Ok(window) =
+                    self.grid
+                        .get_subgrid(rule_x, rule_y, rule_dims.width, rule_dims.height)
                 {
                     let particle_kind_window: Grid<Option<ParticleKind>> = Grid::new(
                         window
@@ -170,54 +167,22 @@ impl CellWorld {
                     .unwrap();
 
                     if rule.matches(&particle_kind_window) {
-                        any_rule_applied = true;
                         let chosen_output = self.choose_rule_output(rule);
-                        new_grid.set_subgrid(min_x, min_y, chosen_output).unwrap();
+                        new_grid.set_subgrid(rule_x, rule_y, chosen_output).unwrap();
 
-                        // Mark the affected area
-                        for dy in min_y..max_y {
-                            for dx in min_x..max_x {
-                                next_active_cells.mark_affected(dx, dy);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Mark cells as affected if rules applied to them
-            if any_rule_applied {
-                for dy in min_y..max_y {
-                    for dx in min_x..max_x {
-                        next_active_cells.mark_affected(dx, dy);
-                    }
-                }
-            }
-        }
-
-        // Second pass: determine which cells should be active next frame
-        for y in 0..self.grid.dimensions().height {
-            for x in 0..self.grid.dimensions().width {
-                if let Ok(cell) = self.grid.get(x, y) {
-                    if cell.content.is_some() {
-                        let was_affected = next_active_cells.affected_this_frame.contains(&(x, y));
-                        let has_space_below = y + 1 < self.grid.dimensions().height
-                            && self
-                                .grid
-                                .get(x, y + 1)
-                                .map(|c| c.content.is_none())
-                                .unwrap_or(false);
-
-                        if was_affected || has_space_below {
-                            next_active_cells.mark_for_next_frame(x, y);
-
-                            // Mark neighbors for next frame
-                            for dy in
-                                y.saturating_sub(1)..=(y + 1).min(self.grid.dimensions().height - 1)
+                        // Mark cells centered on the particle
+                        for dy in
+                            y.saturating_sub(1)..=(y + 1).min(self.grid.dimensions().height - 1)
+                        {
+                            for dx in
+                                x.saturating_sub(1)..=(x + 1).min(self.grid.dimensions().width - 1)
                             {
-                                for dx in x.saturating_sub(1)
-                                    ..=(x + 1).min(self.grid.dimensions().width - 1)
-                                {
-                                    next_active_cells.mark_for_next_frame(dx, dy);
+                                next_active_cells.mark_affected(dx, dy);
+                                next_active_cells.mark_for_next_frame(dx, dy);
+
+                                if dy + 1 < self.grid.dimensions().height {
+                                    next_active_cells.cells.insert((dx, dy + 1));
+                                    next_active_cells.mark_for_next_frame(dx, dy + 1);
                                 }
                             }
                         }
