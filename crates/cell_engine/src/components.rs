@@ -48,6 +48,7 @@ impl Default for ParticleCell {
 pub struct ActiveCells {
     pub cells: HashSet<(usize, usize)>,
     pub to_check_next_frame: HashSet<(usize, usize)>,
+    pub affected_this_frame: HashSet<(usize, usize)>,
 }
 
 impl ActiveCells {
@@ -55,6 +56,7 @@ impl ActiveCells {
         Self {
             cells: HashSet::new(),
             to_check_next_frame: HashSet::new(),
+            affected_this_frame: HashSet::new(),
         }
     }
 
@@ -66,9 +68,14 @@ impl ActiveCells {
         self.to_check_next_frame.insert((x, y));
     }
 
+    pub fn mark_affected(&mut self, x: usize, y: usize) {
+        self.affected_this_frame.insert((x, y));
+    }
+
     pub fn update(&mut self) {
         std::mem::swap(&mut self.cells, &mut self.to_check_next_frame);
         self.to_check_next_frame.clear();
+        self.affected_this_frame.clear();
     }
 }
 
@@ -125,33 +132,16 @@ impl CellWorld {
     pub fn update(&mut self, rules: &Vec<Rule<Option<ParticleKind>>>) {
         let mut new_grid = self.grid.clone();
         let cells_to_check: Vec<_> = self.active_cells.cells.iter().cloned().collect();
-
         let mut next_active_cells = std::mem::take(&mut self.active_cells);
 
-        // First, mark all cells that contain particles and their neighbors as active
-        for &(x, y) in &cells_to_check {
-            if let Ok(cell) = self.grid.get(x, y) {
-                if cell.content.is_some() {
-                    // If cell has a particle, mark it and its neighbors
-                    for dy in y.saturating_sub(1)..=(y + 1) {
-                        for dx in x.saturating_sub(1)..=(x + 1) {
-                            if dy < self.grid.dimensions().height
-                                && dx < self.grid.dimensions().width
-                            {
-                                next_active_cells.mark_for_next_frame(dx, dy);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Process rules as before
+        // Process rules and track which cells were affected
         for &(x, y) in &cells_to_check {
             let min_x = x.saturating_sub(1);
             let min_y = y.saturating_sub(1);
             let max_x = (x + 2).min(self.grid.dimensions().width);
             let max_y = (y + 2).min(self.grid.dimensions().height);
+
+            let mut any_rule_applied = false;
 
             for rule in rules {
                 let rule_dims = rule.dimensions();
@@ -180,15 +170,52 @@ impl CellWorld {
                     .unwrap();
 
                     if rule.matches(&particle_kind_window) {
-                        // info!("Rule matched at ({}, {})", x, y);
+                        any_rule_applied = true;
                         let chosen_output = self.choose_rule_output(rule);
                         new_grid.set_subgrid(min_x, min_y, chosen_output).unwrap();
 
-                        // Mark the affected area and surroundings
-                        for dy in min_y.saturating_sub(1)..=(min_y + window_height + 1) {
-                            for dx in min_x.saturating_sub(1)..=(min_x + window_width) {
-                                if dy < self.grid.dimensions().height
-                                    && dx < self.grid.dimensions().width
+                        // Mark the affected area
+                        for dy in min_y..max_y {
+                            for dx in min_x..max_x {
+                                next_active_cells.mark_affected(dx, dy);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Mark cells as affected if rules applied to them
+            if any_rule_applied {
+                for dy in min_y..max_y {
+                    for dx in min_x..max_x {
+                        next_active_cells.mark_affected(dx, dy);
+                    }
+                }
+            }
+        }
+
+        // Second pass: determine which cells should be active next frame
+        for y in 0..self.grid.dimensions().height {
+            for x in 0..self.grid.dimensions().width {
+                if let Ok(cell) = self.grid.get(x, y) {
+                    if cell.content.is_some() {
+                        let was_affected = next_active_cells.affected_this_frame.contains(&(x, y));
+                        let has_space_below = y + 1 < self.grid.dimensions().height
+                            && self
+                                .grid
+                                .get(x, y + 1)
+                                .map(|c| c.content.is_none())
+                                .unwrap_or(false);
+
+                        if was_affected || has_space_below {
+                            next_active_cells.mark_for_next_frame(x, y);
+
+                            // Mark neighbors for next frame
+                            for dy in
+                                y.saturating_sub(1)..=(y + 1).min(self.grid.dimensions().height - 1)
+                            {
+                                for dx in x.saturating_sub(1)
+                                    ..=(x + 1).min(self.grid.dimensions().width - 1)
                                 {
                                     next_active_cells.mark_for_next_frame(dx, dy);
                                 }
