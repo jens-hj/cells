@@ -2,6 +2,35 @@ use percentage::Percentage;
 
 use crate::grid::{Dimensions, Grid};
 
+/// A type similar to [`Option`], but with a few extra tricks
+#[derive(Debug, Clone)]
+pub enum Occupancy<T> {
+    /// The cell is occupied by `T`, should be thought of as [`Option::Some`]
+    OccupiedBy(T),
+    /// The cell is occupied by an unspecified, same as pattern matching `Occupancy::OccupiedBy(_)`,
+    /// but it's all handled by this type
+    OccupiedByAny,
+    /// We don't care whether the cell is occupied or not, same as pattern matching `_`
+    Unknown,
+    /// The cell is not occupied, should be thought of as [`Option::None`]
+    Vacant,
+}
+
+impl<T: PartialEq> PartialEq for Occupancy<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Occupancy::OccupiedBy(a), Occupancy::OccupiedBy(b)) => a == b,
+            (Occupancy::OccupiedByAny, Occupancy::OccupiedByAny) => true,
+            (Occupancy::OccupiedBy(_), Occupancy::OccupiedByAny) => true,
+            (Occupancy::OccupiedByAny, Occupancy::OccupiedBy(_)) => true,
+            (Occupancy::Unknown, _) => true,
+            (_, Occupancy::Unknown) => true,
+            (Occupancy::Vacant, Occupancy::Vacant) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Input<T: Clone + PartialEq + std::fmt::Debug> {
     pub grid: Grid<T>,

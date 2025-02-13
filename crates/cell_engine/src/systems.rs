@@ -6,7 +6,7 @@ use bevy_catppuccin::CatppuccinTheme;
 use bevy_pointer_to_world::{PointerToWorldCamera, PointerWorldPosition};
 use cell_particle::grid::{Dimensions, Grid};
 use cell_particle::particle::{Particle, ParticleKind};
-use cell_particle::rule::{Input, Output, Rule};
+use cell_particle::rule::{Input, Occupancy, Output, Rule};
 use percentage::Percentage;
 
 use crate::{CellRule, CellWorld, ParticleCell, View, WorldTexture};
@@ -32,10 +32,18 @@ pub fn setup_rules(mut commands: Commands) {
     commands.spawn(CellRule {
         rule: Rule {
             input: Input {
-                grid: Grid::new(vec![vec![Some(ParticleKind::Sand)], vec![None]]).unwrap(),
+                grid: Grid::new(vec![
+                    vec![Occupancy::OccupiedBy(ParticleKind::Sand)],
+                    vec![Occupancy::Vacant],
+                ])
+                .unwrap(),
             },
             output: vec![Output {
-                grid: Grid::new(vec![vec![None], vec![Some(ParticleKind::Sand)]]).unwrap(),
+                grid: Grid::new(vec![
+                    vec![Occupancy::Vacant],
+                    vec![Occupancy::OccupiedBy(ParticleKind::Sand)],
+                ])
+                .unwrap(),
                 probability: Percentage::new(1.0),
             }],
         },
@@ -45,31 +53,99 @@ pub fn setup_rules(mut commands: Commands) {
         rule: Rule {
             input: Input {
                 grid: Grid::new(vec![
-                    vec![None, Some(ParticleKind::Sand), None],
-                    vec![None, Some(ParticleKind::Sand), None],
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                        Occupancy::Unknown,
+                    ],
+                    vec![Occupancy::OccupiedBy(ParticleKind::Sand), Occupancy::Vacant],
                 ])
                 .unwrap(),
             },
-            output: vec![
-                Output {
-                    grid: Grid::new(vec![
-                        vec![None, None, None],
-                        vec![None, Some(ParticleKind::Sand), Some(ParticleKind::Sand)],
-                    ])
-                    .unwrap(),
-                    probability: Percentage::new(0.5),
-                },
-                Output {
-                    grid: Grid::new(vec![
-                        vec![None, None, None],
-                        vec![Some(ParticleKind::Sand), Some(ParticleKind::Sand), None],
-                    ])
-                    .unwrap(),
-                    probability: Percentage::new(0.5),
-                },
-            ],
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Occupancy::Vacant, Occupancy::Unknown],
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                    ],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
         },
     });
+
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::Unknown,
+                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                    ],
+                    vec![Occupancy::Vacant, Occupancy::OccupiedBy(ParticleKind::Sand)],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Occupancy::Vacant, Occupancy::Unknown],
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                    ],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+    });
+
+    // commands.spawn(CellRule {
+    //     rule: Rule {
+    //         input: Input {
+    //             grid: Grid::new(vec![
+    //                 vec![
+    //                     Occupancy::Unknown,
+    //                     Occupancy::OccupiedBy(ParticleKind::Sand),
+    //                     Occupancy::Unknown,
+    //                 ],
+    //                 vec![
+    //                     Occupancy::Vacant,
+    //                     Occupancy::OccupiedBy(ParticleKind::Sand),
+    //                     Occupancy::Vacant,
+    //                 ],
+    //             ])
+    //             .unwrap(),
+    //         },
+    //         output: vec![
+    //             Output {
+    //                 grid: Grid::new(vec![
+    //                     vec![Occupancy::Unknown, Occupancy::Vacant, Occupancy::Unknown],
+    //                     vec![
+    //                         Occupancy::Vacant,
+    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
+    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
+    //                     ],
+    //                 ])
+    //                 .unwrap(),
+    //                 probability: Percentage::new(0.5),
+    //             },
+    //             Output {
+    //                 grid: Grid::new(vec![
+    //                     vec![Occupancy::Unknown, Occupancy::Vacant, Occupancy::Unknown],
+    //                     vec![
+    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
+    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
+    //                         Occupancy::Vacant,
+    //                     ],
+    //                 ])
+    //                 .unwrap(),
+    //                 probability: Percentage::new(0.5),
+    //             },
+    //         ],
+    //     },
+    // });
 }
 
 /// Bevy [`Startup`] system to setup the visualisation of the world

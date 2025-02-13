@@ -5,7 +5,7 @@ use bevy_catppuccin::*;
 use cell_particle::{
     grid::Grid,
     particle::{self, Particle, ParticleKind},
-    rule::Rule,
+    rule::{Occupancy, Rule},
 };
 use rand::{
     distr::{weighted::WeightedIndex, Distribution},
@@ -16,7 +16,7 @@ use strum::IntoEnumIterator;
 /// Bevy [`Component`] for a cellular automaton rule
 #[derive(Component, Debug, Clone)]
 pub struct CellRule {
-    pub rule: Rule<Option<ParticleKind>>,
+    pub rule: Rule<Occupancy<ParticleKind>>,
 }
 
 /// Wrapper cell for [`Particle`], which optionally contains a [`Particle`], and can tell you its color
@@ -129,7 +129,7 @@ impl CellWorld {
         self
     }
 
-    pub fn update(&mut self, rules: &Vec<Rule<Option<ParticleKind>>>) {
+    pub fn update(&mut self, rules: &Vec<Rule<Occupancy<ParticleKind>>>) {
         let mut new_grid = self.grid.clone();
         let cells_to_check: Vec<_> = self.active_cells.cells.iter().cloned().collect();
         let mut next_active_cells = std::mem::take(&mut self.active_cells);
@@ -153,13 +153,18 @@ impl CellWorld {
                     self.grid
                         .get_subgrid(rule_x, rule_y, rule_dims.width, rule_dims.height)
                 {
-                    let particle_kind_window: Grid<Option<ParticleKind>> = Grid::new(
+                    let particle_kind_window: Grid<Occupancy<ParticleKind>> = Grid::new(
                         window
                             .cells
                             .iter()
                             .map(|row| {
                                 row.iter()
-                                    .map(|cell| cell.content.as_ref().map(|p| p.kind.clone()))
+                                    .map(|cell| {
+                                        match cell.content.as_ref().map(|p| p.kind.clone()) {
+                                            Some(kind) => Occupancy::OccupiedBy(kind),
+                                            None => Occupancy::Vacant,
+                                        }
+                                    })
                                     .collect()
                             })
                             .collect(),
@@ -196,7 +201,7 @@ impl CellWorld {
         self.active_cells.update();
     }
 
-    fn choose_rule_output(&self, rule: &Rule<Option<ParticleKind>>) -> Grid<ParticleCell> {
+    fn choose_rule_output(&self, rule: &Rule<Occupancy<ParticleKind>>) -> Grid<ParticleCell> {
         let weighted_index =
             WeightedIndex::new(rule.output.iter().map(|o| o.probability.value())).unwrap();
         let chosen_output = rule.output[weighted_index.sample(&mut rand::rng())].clone();
@@ -210,7 +215,12 @@ impl CellWorld {
                 .map(|row| {
                     row.iter()
                         .map(|cell| ParticleCell {
-                            content: cell.clone().map(|kind| particle::Particle::new(kind)),
+                            content: match cell {
+                                Occupancy::OccupiedBy(kind) => {
+                                    Some(particle::Particle::new(kind.clone()))
+                                }
+                                _ => None,
+                            },
                         })
                         .collect()
                 })
