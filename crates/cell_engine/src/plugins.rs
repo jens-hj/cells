@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_catppuccin::{CatppuccinTheme, Flavor};
 use bevy_pointer_to_world::PointerToWorldPlugin;
 
-use crate::systems::*;
+use crate::{systems::*, Tool};
 
 #[cfg(feature = "debug")]
 use crate::Stats;
@@ -18,16 +18,30 @@ impl Plugin for CellEnginePlugin {
         app.insert_resource(theme);
         app.insert_resource(ClearColor(theme.flavor.base));
 
+        app.init_resource::<Tool>();
+
         // Insert plugins
         app.add_plugins(PointerToWorldPlugin);
 
         // Set up the systems
         app.add_systems(
             Startup,
-            ((setup_environment, setup_view).chain(), setup_rules),
+            (
+                (setup_environment, setup_view).chain(),
+                setup_rules,
+                setup_tool_text,
+            ),
         );
         app.add_systems(FixedUpdate, grid_update);
-        app.add_systems(Update, (view_update, mouse_input));
+        app.add_systems(
+            Update,
+            (
+                view_update,
+                mouse_input,
+                tool_switch,
+                update_tool_text,
+            ),
+        );
 
         #[cfg(feature = "debug")]
         {

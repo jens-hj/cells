@@ -249,6 +249,10 @@ pub struct View;
 #[derive(Component, Debug, Clone)]
 pub struct WorldTexture;
 
+/// Bevy marker [`Component`] for the text of the current tool
+#[derive(Component, Debug, Clone)]
+pub struct ToolText;
+
 pub mod stats {
     use bevy::prelude::*;
 

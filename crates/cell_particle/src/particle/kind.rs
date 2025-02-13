@@ -1,6 +1,6 @@
 use strum_macros::EnumIter;
 
-#[derive(Debug, Clone, PartialEq, Eq, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 pub enum ParticleKind {
     Sand,
     Water,

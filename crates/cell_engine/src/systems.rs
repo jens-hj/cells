@@ -10,7 +10,7 @@ use cell_particle::rule::{Input, Occupancy, Output, Rule};
 use percentage::Percentage;
 
 use crate::stats::{ExistingParticleCountText, SpawnedParticleCountText};
-use crate::{CellRule, CellWorld, ParticleCell, View, WorldTexture};
+use crate::{CellRule, CellWorld, ParticleCell, Tool, ToolText, View, WorldTexture};
 
 #[cfg(feature = "debug")]
 use crate::Stats;
@@ -211,6 +211,7 @@ pub fn mouse_input(
     mouse_button_input: ResMut<ButtonInput<MouseButton>>,
     pointer_world_position: Res<PointerWorldPosition>,
     mut cell_worlds: Query<&mut CellWorld>,
+    tool: Res<Tool>,
     #[cfg(feature = "debug")] mut stats: ResMut<Stats>,
 ) {
     if mouse_button_input.pressed(MouseButton::Left) {
@@ -228,13 +229,15 @@ pub fn mouse_input(
 
         // set the cell
         if let Ok(cell) = cell_world.grid.get_mut(x, y) {
-            *cell = ParticleCell {
-                content: Some(Particle::new(ParticleKind::Sand)),
-            };
-
-            #[cfg(feature = "debug")]
-            {
-                stats.spawned_particles += 1;
+            match *tool {
+                Tool::Despawn => {
+                    *cell = ParticleCell { content: None };
+                }
+                Tool::Spawn(particle_kind) => {
+                    *cell = ParticleCell {
+                        content: Some(Particle::new(particle_kind)),
+                    };
+                }
             }
 
             // Mark the cell and its neighbors as active
@@ -243,7 +246,52 @@ pub fn mouse_input(
                     cell_world.active_cells.mark_active(dx, dy);
                 }
             }
+
+            #[cfg(feature = "debug")]
+            {
+                stats.spawned_particles += 1;
+            }
         }
+    }
+}
+
+/// Bevy [`Update`] system to switch between tools, selects tool based on number keys
+pub fn tool_switch(keyboard_input: ResMut<ButtonInput<KeyCode>>, mut tool: ResMut<Tool>) {
+    if keyboard_input.just_pressed(KeyCode::Digit1) {
+        *tool = Tool::Despawn;
+    } else if keyboard_input.just_pressed(KeyCode::Digit2) {
+        *tool = Tool::Spawn(ParticleKind::Sand);
+    } else if keyboard_input.just_pressed(KeyCode::Digit3) {
+        *tool = Tool::Spawn(ParticleKind::Water);
+    } else if keyboard_input.just_pressed(KeyCode::Digit4) {
+        *tool = Tool::Spawn(ParticleKind::Stone);
+    }
+}
+
+/// Bevy [`Startup`] system to setup the text to display the current tool
+pub fn setup_tool_text(mut commands: Commands, theme: Res<CatppuccinTheme>) {
+    commands
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(10.0),
+            right: Val::Px(10.0),
+            ..default()
+        })
+        .with_child((
+            Text::default(),
+            TextFont {
+                font_size: 20.0,
+                ..default()
+            },
+            TextColor(theme.flavor.lavender),
+            ToolText,
+        ));
+}
+
+/// Bevy [`Update`] system to update the text to display the current tool
+pub fn update_tool_text(tool: Res<Tool>, mut tool_text: Query<&mut Text, With<ToolText>>) {
+    if let Ok(mut tool_text) = tool_text.get_single_mut() {
+        tool_text.0 = format!("Tool: {}", *tool);
     }
 }
 
