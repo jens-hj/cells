@@ -4,6 +4,9 @@ use bevy_pointer_to_world::PointerToWorldPlugin;
 
 use crate::systems::*;
 
+#[cfg(feature = "debug")]
+use crate::Stats;
+
 pub struct CellEnginePlugin;
 
 impl Plugin for CellEnginePlugin {
@@ -28,7 +31,16 @@ impl Plugin for CellEnginePlugin {
 
         #[cfg(feature = "debug")]
         {
-            app.add_systems(Update, draw_active_cells);
+            app.init_resource::<Stats>();
+            app.add_systems(Startup, setup_particle_count_text);
+            app.add_systems(
+                Update,
+                (
+                    draw_active_cells,
+                    existing_particle_count,
+                    particle_count_text,
+                ),
+            );
         }
     }
 }

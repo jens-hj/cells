@@ -245,5 +245,18 @@ pub struct MainCamera;
 #[derive(Component, Debug, Clone)]
 pub struct View;
 
+/// Bevy marker [`Component`] for the texture of the world
 #[derive(Component, Debug, Clone)]
 pub struct WorldTexture;
+
+pub mod stats {
+    use bevy::prelude::*;
+
+    /// Bevy marker [`Component`] for the text of the number of spawned particles
+    #[derive(Component, Debug, Clone)]
+    pub struct SpawnedParticleCountText;
+
+    /// Bevy marker [`Component`] for the text of the number of existing particles
+    #[derive(Component, Debug, Clone)]
+    pub struct ExistingParticleCountText;
+}

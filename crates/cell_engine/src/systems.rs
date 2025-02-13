@@ -9,7 +9,11 @@ use cell_particle::particle::{Particle, ParticleKind};
 use cell_particle::rule::{Input, Occupancy, Output, Rule};
 use percentage::Percentage;
 
+use crate::stats::{ExistingParticleCountText, SpawnedParticleCountText};
 use crate::{CellRule, CellWorld, ParticleCell, View, WorldTexture};
+
+#[cfg(feature = "debug")]
+use crate::Stats;
 
 /// Bevy [`Startup`] system to setup the environment
 pub fn setup_environment(mut commands: Commands, theme: Res<CatppuccinTheme>) {
@@ -100,52 +104,6 @@ pub fn setup_rules(mut commands: Commands) {
             }],
         },
     });
-
-    // commands.spawn(CellRule {
-    //     rule: Rule {
-    //         input: Input {
-    //             grid: Grid::new(vec![
-    //                 vec![
-    //                     Occupancy::Unknown,
-    //                     Occupancy::OccupiedBy(ParticleKind::Sand),
-    //                     Occupancy::Unknown,
-    //                 ],
-    //                 vec![
-    //                     Occupancy::Vacant,
-    //                     Occupancy::OccupiedBy(ParticleKind::Sand),
-    //                     Occupancy::Vacant,
-    //                 ],
-    //             ])
-    //             .unwrap(),
-    //         },
-    //         output: vec![
-    //             Output {
-    //                 grid: Grid::new(vec![
-    //                     vec![Occupancy::Unknown, Occupancy::Vacant, Occupancy::Unknown],
-    //                     vec![
-    //                         Occupancy::Vacant,
-    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
-    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
-    //                     ],
-    //                 ])
-    //                 .unwrap(),
-    //                 probability: Percentage::new(0.5),
-    //             },
-    //             Output {
-    //                 grid: Grid::new(vec![
-    //                     vec![Occupancy::Unknown, Occupancy::Vacant, Occupancy::Unknown],
-    //                     vec![
-    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
-    //                         Occupancy::OccupiedBy(ParticleKind::Sand),
-    //                         Occupancy::Vacant,
-    //                     ],
-    //                 ])
-    //                 .unwrap(),
-    //                 probability: Percentage::new(0.5),
-    //             },
-    //         ],
-    //     },
-    // });
 }
 
 /// Bevy [`Startup`] system to setup the visualisation of the world
@@ -253,6 +211,7 @@ pub fn mouse_input(
     mouse_button_input: ResMut<ButtonInput<MouseButton>>,
     pointer_world_position: Res<PointerWorldPosition>,
     mut cell_worlds: Query<&mut CellWorld>,
+    #[cfg(feature = "debug")] mut stats: ResMut<Stats>,
 ) {
     if mouse_button_input.pressed(MouseButton::Left) {
         let Ok(mut cell_world) = cell_worlds.get_single_mut() else {
@@ -272,6 +231,11 @@ pub fn mouse_input(
             *cell = ParticleCell {
                 content: Some(Particle::new(ParticleKind::Sand)),
             };
+
+            #[cfg(feature = "debug")]
+            {
+                stats.spawned_particles += 1;
+            }
 
             // Mark the cell and its neighbors as active
             for dy in y.saturating_sub(1)..=(y + 1) {
@@ -304,5 +268,82 @@ pub fn draw_active_cells(
                 theme.flavor.red,
             );
         }
+    }
+}
+
+/// Bevy [`Startup`] system to setup the text on the screen counting the number of spawned particles
+#[cfg(feature = "debug")]
+pub fn setup_particle_count_text(mut commands: Commands, theme: Res<CatppuccinTheme>) {
+    commands
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                column_gap: Val::Px(10.0),
+                ..default()
+            },
+            PickingBehavior::IGNORE,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::default(),
+                TextFont {
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(theme.flavor.red),
+                SpawnedParticleCountText,
+            ));
+
+            parent.spawn((
+                Text::default(),
+                TextFont {
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(theme.flavor.green),
+                ExistingParticleCountText,
+            ));
+        });
+}
+
+/// Bevy [`Update`] system to keep track of the number of existing particles
+#[cfg(feature = "debug")]
+pub fn existing_particle_count(cell_worlds: Query<&CellWorld>, mut stats: ResMut<Stats>) {
+    for cell_world in cell_worlds.iter() {
+        stats.existing_particles = cell_world
+            .grid
+            .iter()
+            .filter(|cell| cell.content.is_some())
+            .count();
+    }
+}
+
+/// Bevy [`Update`] system to place text on the screen counting the number of spawned particles
+/// and the number of existing particles. This is used to make sure particles don't annihilate
+/// each other.
+#[cfg(feature = "debug")]
+pub fn particle_count_text(
+    mut spawned_particle_count: Query<
+        &mut Text,
+        (
+            With<SpawnedParticleCountText>,
+            Without<ExistingParticleCountText>,
+        ),
+    >,
+    mut existing_particle_count: Query<
+        &mut Text,
+        (
+            With<ExistingParticleCountText>,
+            Without<SpawnedParticleCountText>,
+        ),
+    >,
+    stats: Res<Stats>,
+) {
+    if let Ok(mut spawned_particle_count) = spawned_particle_count.get_single_mut() {
+        spawned_particle_count.0 = format!("Spawned: {}", stats.spawned_particles);
+    }
+
+    if let Ok(mut existing_particle_count) = existing_particle_count.get_single_mut() {
+        existing_particle_count.0 = format!("Existing: {}", stats.existing_particles);
     }
 }
