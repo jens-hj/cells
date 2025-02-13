@@ -9,6 +9,7 @@ use cell_particle::{
 };
 use rand::{
     distr::{weighted::WeightedIndex, Distribution},
+    seq::SliceRandom,
     Rng,
 };
 use strum::IntoEnumIterator;
@@ -134,9 +135,18 @@ impl CellWorld {
         let cells_to_check: Vec<_> = self.active_cells.cells.iter().cloned().collect();
         let mut next_active_cells = std::mem::take(&mut self.active_cells);
 
+        // Create a mutable copy of rules and shuffle them
+        let mut shuffled_rules = rules.clone();
+        shuffled_rules.shuffle(&mut rand::rng());
+
         // Process rules and track which cells were affected
-        for &(x, y) in &cells_to_check {
-            for rule in rules {
+        'cell_loop: for &(x, y) in &cells_to_check {
+            // Skip if this cell has already been affected by a rule this frame
+            if next_active_cells.affected_this_frame.contains(&(x, y)) {
+                continue;
+            }
+
+            for rule in &shuffled_rules {
                 let rule_dims = rule.dimensions();
 
                 // Center the rule window on the particle
@@ -172,25 +182,32 @@ impl CellWorld {
                     .unwrap();
 
                     if rule.matches(&particle_kind_window) {
-                        let chosen_output = self.choose_rule_output(rule);
+                        let chosen_output = self.choose_rule_output(rule, &window);
                         new_grid.set_subgrid(rule_x, rule_y, chosen_output).unwrap();
 
-                        // Mark cells centered on the particle
+                        // Mark all cells in the rule window as affected
+                        for dy in 0..rule_dims.height {
+                            for dx in 0..rule_dims.width {
+                                next_active_cells.mark_affected(rule_x + dx, rule_y + dy);
+                            }
+                        }
+
+                        // Mark cells for next frame's active set
                         for dy in
                             y.saturating_sub(1)..=(y + 1).min(self.grid.dimensions().height - 1)
                         {
                             for dx in
                                 x.saturating_sub(1)..=(x + 1).min(self.grid.dimensions().width - 1)
                             {
-                                next_active_cells.mark_affected(dx, dy);
                                 next_active_cells.mark_for_next_frame(dx, dy);
 
                                 if dy + 1 < self.grid.dimensions().height {
-                                    next_active_cells.cells.insert((dx, dy + 1));
                                     next_active_cells.mark_for_next_frame(dx, dy + 1);
                                 }
                             }
                         }
+
+                        continue 'cell_loop; // Skip remaining rules for this cell
                     }
                 }
             }
@@ -201,7 +218,11 @@ impl CellWorld {
         self.active_cells.update();
     }
 
-    fn choose_rule_output(&self, rule: &Rule<Occupancy<ParticleKind>>) -> Grid<ParticleCell> {
+    fn choose_rule_output(
+        &self,
+        rule: &Rule<Occupancy<ParticleKind>>,
+        current_grid_window: &Grid<ParticleCell>,
+    ) -> Grid<ParticleCell> {
         let weighted_index =
             WeightedIndex::new(rule.output.iter().map(|o| o.probability.value())).unwrap();
         let chosen_output = rule.output[weighted_index.sample(&mut rand::rng())].clone();
@@ -212,12 +233,17 @@ impl CellWorld {
                 .grid
                 .cells
                 .iter()
-                .map(|row| {
+                .enumerate()
+                .map(|(y, row)| {
                     row.iter()
-                        .map(|cell| ParticleCell {
+                        .enumerate()
+                        .map(|(x, cell)| ParticleCell {
                             content: match cell {
                                 Occupancy::OccupiedBy(kind) => {
                                     Some(particle::Particle::new(kind.clone()))
+                                }
+                                Occupancy::Unknown | Occupancy::OccupiedByAny => {
+                                    current_grid_window.get(x, y).unwrap().content.clone()
                                 }
                                 _ => None,
                             },

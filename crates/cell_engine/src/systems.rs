@@ -9,6 +9,7 @@ use cell_particle::particle::{Particle, ParticleKind};
 use cell_particle::rule::{Input, Occupancy, Output, Rule};
 use percentage::Percentage;
 
+#[cfg(feature = "debug")]
 use crate::stats::{ExistingParticleCountText, SpawnedParticleCountText};
 use crate::{CellRule, CellWorld, ParticleCell, Tool, ToolText, View, WorldTexture};
 
@@ -93,7 +94,7 @@ pub fn setup_rules(mut commands: Commands) {
             },
             output: vec![Output {
                 grid: Grid::new(vec![
-                    vec![Occupancy::Vacant, Occupancy::Unknown],
+                    vec![Occupancy::Unknown, Occupancy::Vacant],
                     vec![
                         Occupancy::OccupiedBy(ParticleKind::Sand),
                         Occupancy::OccupiedBy(ParticleKind::Sand),

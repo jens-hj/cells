@@ -18,6 +18,9 @@ impl Plugin for CellEnginePlugin {
         app.insert_resource(theme);
         app.insert_resource(ClearColor(theme.flavor.base));
 
+        // Set up fixed update
+        app.insert_resource(Time::<Fixed>::from_hz(100.0));
+
         app.init_resource::<Tool>();
 
         // Insert plugins
@@ -32,16 +35,8 @@ impl Plugin for CellEnginePlugin {
                 setup_tool_text,
             ),
         );
-        app.add_systems(FixedUpdate, grid_update);
-        app.add_systems(
-            Update,
-            (
-                view_update,
-                mouse_input,
-                tool_switch,
-                update_tool_text,
-            ),
-        );
+        app.add_systems(FixedUpdate, (grid_update, mouse_input));
+        app.add_systems(Update, (view_update, tool_switch, update_tool_text));
 
         #[cfg(feature = "debug")]
         {
