@@ -17,7 +17,10 @@ use strum::IntoEnumIterator;
 /// Bevy [`Component`] for a cellular automaton rule
 #[derive(Component, Debug, Clone)]
 pub struct CellRule {
+    /// The rule to apply
     pub rule: Rule<Occupancy<ParticleKind>>,
+    /// The priority of the rule, if not set, the rule doesn't care about the order of application, and will be randomly shuffled
+    pub priority: Option<usize>,
 }
 
 /// Wrapper cell for [`Particle`], which optionally contains a [`Particle`], and can tell you its color
@@ -130,14 +133,52 @@ impl CellWorld {
         self
     }
 
-    pub fn update(&mut self, rules: &Vec<Rule<Occupancy<ParticleKind>>>) {
+    pub fn update(&mut self, rules: &Vec<CellRule>) {
         let mut new_grid = self.grid.clone();
         let cells_to_check: Vec<_> = self.active_cells.cells.iter().cloned().collect();
         let mut next_active_cells = std::mem::take(&mut self.active_cells);
 
-        // Create a mutable copy of rules and shuffle them
-        let mut shuffled_rules = rules.clone();
-        shuffled_rules.shuffle(&mut rand::rng());
+        // Separate rules into prioritized and unprioritized
+        let (prioritized, unprioritized): (Vec<_>, Vec<_>) =
+            rules.iter().partition(|rule| rule.priority.is_some());
+
+        // Sort prioritized rules by priority
+        let mut ordered_rules: Vec<_> = prioritized.clone();
+        ordered_rules.sort_by_key(|rule| rule.priority.unwrap());
+
+        // Group and shuffle rules with same priority
+        let mut prioritised_rules = Vec::with_capacity(rules.len());
+        let mut current_group = Vec::new();
+        let mut current_priority = None;
+
+        for rule in ordered_rules {
+            match current_priority {
+                None => {
+                    current_priority = Some(rule.priority.unwrap());
+                    current_group.push(rule);
+                }
+                Some(prev) if prev != rule.priority.unwrap() => {
+                    if !current_group.is_empty() {
+                        current_group.shuffle(&mut rand::rng());
+                        prioritised_rules.extend(current_group.drain(..));
+                    }
+                    current_priority = Some(rule.priority.unwrap());
+                    current_group.push(rule);
+                }
+                _ => current_group.push(rule),
+            }
+        }
+        // Handle the last group
+        if !current_group.is_empty() {
+            current_group.shuffle(&mut rand::rng());
+            prioritised_rules.extend(current_group);
+        }
+
+        // Randomly insert unprioritized rules
+        for rule in unprioritized {
+            let insert_pos = rand::rng().random_range(0..=prioritised_rules.len());
+            prioritised_rules.insert(insert_pos, rule);
+        }
 
         // Process rules and track which cells were affected
         'cell_loop: for &(x, y) in &cells_to_check {
@@ -146,7 +187,11 @@ impl CellWorld {
                 continue;
             }
 
-            for rule in &shuffled_rules {
+            for rule in prioritised_rules
+                .iter()
+                .map(|r| r.rule.clone())
+                .collect::<Vec<_>>()
+            {
                 let rule_dims = rule.dimensions();
 
                 // Center the rule window on the particle
@@ -182,7 +227,7 @@ impl CellWorld {
                     .unwrap();
 
                     if rule.matches(&particle_kind_window) {
-                        let chosen_output = self.choose_rule_output(rule, &window);
+                        let chosen_output = self.choose_rule_output(&rule, &window);
                         new_grid.set_subgrid(rule_x, rule_y, chosen_output).unwrap();
 
                         // Mark all cells in the rule window as affected
@@ -279,14 +324,17 @@ pub struct WorldTexture;
 #[derive(Component, Debug, Clone)]
 pub struct ToolText;
 
-pub mod stats {
-    use bevy::prelude::*;
+/// Bevy marker [`Component`] for the text of the number of spawned particles
+#[cfg(feature = "debug")]
+#[derive(Component, Debug, Clone)]
+pub struct SpawnedParticleCountText;
 
-    /// Bevy marker [`Component`] for the text of the number of spawned particles
-    #[derive(Component, Debug, Clone)]
-    pub struct SpawnedParticleCountText;
+/// Bevy marker [`Component`] for the text of the number of existing particles
+#[cfg(feature = "debug")]
+#[derive(Component, Debug, Clone)]
+pub struct ExistingParticleCountText;
 
-    /// Bevy marker [`Component`] for the text of the number of existing particles
-    #[derive(Component, Debug, Clone)]
-    pub struct ExistingParticleCountText;
-}
+/// Bevy marker [`Component`] for the debug menu
+#[cfg(feature = "debug")]
+#[derive(Component, Debug, Clone)]
+pub struct DebugMenu;

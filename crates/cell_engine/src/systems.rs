@@ -9,9 +9,11 @@ use cell_particle::particle::{Particle, ParticleKind};
 use cell_particle::rule::{Input, Occupancy, Output, Rule};
 use percentage::Percentage;
 
-#[cfg(feature = "debug")]
-use crate::stats::{ExistingParticleCountText, SpawnedParticleCountText};
 use crate::{CellRule, CellWorld, ParticleCell, Tool, ToolText, View, WorldTexture};
+#[cfg(feature = "debug")]
+use crate::{
+    DebugMenu, DebugMenuState, ExistingParticleCountText, SpawnedParticleCountText, ToggleDebugMenu,
+};
 
 #[cfg(feature = "debug")]
 use crate::Stats;
@@ -34,6 +36,7 @@ pub fn setup_environment(mut commands: Commands, theme: Res<CatppuccinTheme>) {
 
 /// Bevy [`Startup`] system to setup the rules of the world
 pub fn setup_rules(mut commands: Commands) {
+    // Sand
     commands.spawn(CellRule {
         rule: Rule {
             input: Input {
@@ -52,6 +55,7 @@ pub fn setup_rules(mut commands: Commands) {
                 probability: Percentage::new(1.0),
             }],
         },
+        priority: None,
     });
 
     commands.spawn(CellRule {
@@ -62,7 +66,7 @@ pub fn setup_rules(mut commands: Commands) {
                         Occupancy::OccupiedBy(ParticleKind::Sand),
                         Occupancy::Unknown,
                     ],
-                    vec![Occupancy::OccupiedBy(ParticleKind::Sand), Occupancy::Vacant],
+                    vec![Occupancy::OccupiedByAny, Occupancy::Vacant],
                 ])
                 .unwrap(),
             },
@@ -70,7 +74,7 @@ pub fn setup_rules(mut commands: Commands) {
                 grid: Grid::new(vec![
                     vec![Occupancy::Vacant, Occupancy::Unknown],
                     vec![
-                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                        Occupancy::OccupiedByAny,
                         Occupancy::OccupiedBy(ParticleKind::Sand),
                     ],
                 ])
@@ -78,6 +82,7 @@ pub fn setup_rules(mut commands: Commands) {
                 probability: Percentage::new(1.0),
             }],
         },
+        priority: None,
     });
 
     commands.spawn(CellRule {
@@ -88,7 +93,7 @@ pub fn setup_rules(mut commands: Commands) {
                         Occupancy::Unknown,
                         Occupancy::OccupiedBy(ParticleKind::Sand),
                     ],
-                    vec![Occupancy::Vacant, Occupancy::OccupiedBy(ParticleKind::Sand)],
+                    vec![Occupancy::Vacant, Occupancy::OccupiedByAny],
                 ])
                 .unwrap(),
             },
@@ -97,13 +102,150 @@ pub fn setup_rules(mut commands: Commands) {
                     vec![Occupancy::Unknown, Occupancy::Vacant],
                     vec![
                         Occupancy::OccupiedBy(ParticleKind::Sand),
-                        Occupancy::OccupiedBy(ParticleKind::Sand),
+                        Occupancy::OccupiedByAny,
                     ],
                 ])
                 .unwrap(),
                 probability: Percentage::new(1.0),
             }],
         },
+        priority: None,
+    });
+
+    // Water
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![Occupancy::OccupiedBy(ParticleKind::Water)],
+                    vec![Occupancy::Vacant],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Occupancy::Vacant],
+                    vec![Occupancy::OccupiedBy(ParticleKind::Water)],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+        priority: Some(0),
+    });
+
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                        Occupancy::Unknown,
+                    ],
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                        Occupancy::Vacant,
+                    ],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Occupancy::Vacant, Occupancy::Unknown],
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                    ],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+        priority: Some(1),
+    });
+
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::Unknown,
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                    ],
+                    vec![
+                        Occupancy::Vacant,
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                    ],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![Occupancy::Unknown, Occupancy::Vacant],
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                    ],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+        priority: Some(1),
+    });
+
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                        Occupancy::Vacant,
+                    ],
+                    vec![Occupancy::OccupiedByAny, Occupancy::OccupiedByAny],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::Vacant,
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                    ],
+                    vec![Occupancy::OccupiedByAny, Occupancy::OccupiedByAny],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+        priority: Some(2),
+    });
+
+    commands.spawn(CellRule {
+        rule: Rule {
+            input: Input {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::Vacant,
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                    ],
+                    vec![Occupancy::OccupiedByAny, Occupancy::OccupiedByAny],
+                ])
+                .unwrap(),
+            },
+            output: vec![Output {
+                grid: Grid::new(vec![
+                    vec![
+                        Occupancy::OccupiedBy(ParticleKind::Water),
+                        Occupancy::Vacant,
+                    ],
+                    vec![Occupancy::OccupiedByAny, Occupancy::OccupiedByAny],
+                ])
+                .unwrap(),
+                probability: Percentage::new(1.0),
+            }],
+        },
+        priority: Some(2),
     });
 }
 
@@ -165,7 +307,7 @@ pub fn grid_update(cell_rules: Query<&CellRule>, mut grid: Query<&mut CellWorld>
         return;
     };
 
-    let rules: Vec<_> = cell_rules.iter().map(|r| r.rule.clone()).collect();
+    let rules: Vec<_> = cell_rules.iter().map(|r| r.clone()).collect();
     cell_world.update(&rules);
 }
 
@@ -296,13 +438,48 @@ pub fn update_tool_text(tool: Res<Tool>, mut tool_text: Query<&mut Text, With<To
     }
 }
 
+/// Bevy [`Update`] system to turn on/off debugging when the player pressed D
+#[cfg(feature = "debug")]
+pub fn toggle_debug(
+    keyboard_input: ResMut<ButtonInput<KeyCode>>,
+    mut debug: ResMut<DebugMenuState>,
+    mut event_writer: EventWriter<ToggleDebugMenu>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyD) {
+        debug.toggle();
+        event_writer.send(ToggleDebugMenu);
+    }
+}
+
+/// Bevy [`Update`] system to handle toggling the debug menu
+#[cfg(feature = "debug")]
+pub fn toggle_debug_menu(
+    mut query: Query<&mut Visibility, With<DebugMenu>>,
+    debug_menu_state: Res<DebugMenuState>,
+    mut event_reader: EventReader<ToggleDebugMenu>,
+) {
+    if let Ok(mut visibility) = query.get_single_mut() {
+        for _ in event_reader.read() {
+            match *debug_menu_state {
+                DebugMenuState::On => *visibility = Visibility::Inherited,
+                DebugMenuState::Off => *visibility = Visibility::Hidden,
+            }
+        }
+    }
+}
+
 /// Bevy [`Update`] system to draw gizmos outlining the active cells
 #[cfg(feature = "debug")]
 pub fn draw_active_cells(
     mut gizmos: Gizmos,
     cell_worlds: Query<&CellWorld>,
     theme: Res<CatppuccinTheme>,
+    debug_menu_state: Res<DebugMenuState>,
 ) {
+    if matches!(*debug_menu_state, DebugMenuState::Off) {
+        return;
+    }
+
     for cell_world in cell_worlds.iter() {
         for (x, y) in cell_world.active_cells.cells.iter() {
             gizmos.rect_2d(
@@ -322,7 +499,16 @@ pub fn draw_active_cells(
 
 /// Bevy [`Startup`] system to setup the text on the screen counting the number of spawned particles
 #[cfg(feature = "debug")]
-pub fn setup_particle_count_text(mut commands: Commands, theme: Res<CatppuccinTheme>) {
+pub fn setup_particle_count_text(
+    mut commands: Commands,
+    theme: Res<CatppuccinTheme>,
+    debug_menu_state: Res<DebugMenuState>,
+) {
+    let menu_visibility = match *debug_menu_state {
+        DebugMenuState::On => Visibility::Inherited,
+        DebugMenuState::Off => Visibility::Hidden,
+    };
+
     commands
         .spawn((
             Node {
@@ -330,7 +516,9 @@ pub fn setup_particle_count_text(mut commands: Commands, theme: Res<CatppuccinTh
                 column_gap: Val::Px(10.0),
                 ..default()
             },
+            DebugMenu,
             PickingBehavior::IGNORE,
+            menu_visibility,
         ))
         .with_children(|parent| {
             parent.spawn((

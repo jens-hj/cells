@@ -17,6 +17,34 @@ impl Default for Stats {
     }
 }
 
+/// Bevy [`Resource`] to turn on/off debugging.
+/// Future: Have multiple debug menus of varying complexity or categories
+#[cfg(feature = "debug")]
+#[derive(Resource, Debug, Clone)]
+pub enum DebugMenuState {
+    /// Turn on/off debugging
+    On,
+    /// Turn off debugging
+    Off,
+}
+
+#[cfg(feature = "debug")]
+impl Default for DebugMenuState {
+    fn default() -> Self {
+        Self::On
+    }
+}
+
+#[cfg(feature = "debug")]
+impl DebugMenuState {
+    pub fn toggle(&mut self) {
+        match self {
+            Self::On => *self = Self::Off,
+            Self::Off => *self = Self::On,
+        }
+    }
+}
+
 /// Bevy [`Resource`] to keep track of which tool is currently selected
 #[derive(Resource, Debug, Clone)]
 pub enum Tool {
