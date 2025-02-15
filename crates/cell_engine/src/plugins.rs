@@ -33,6 +33,7 @@ impl Plugin for CellEnginePlugin {
                 (setup_environment, setup_view).chain(),
                 setup_rules,
                 setup_tool_text,
+                setup_compute_resources,
             ),
         );
         app.add_systems(FixedUpdate, (grid_update, mouse_input));

@@ -1,7 +1,13 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::image::ImageSampler;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
+use bevy::render::render_resource::{
+    BindGroupEntry, BindGroupLayoutEntry, BindingType, BufferBindingType, BufferDescriptor,
+    BufferUsages, CommandEncoderDescriptor, ComputePassDescriptor, Extent3d,
+    PipelineLayoutDescriptor, RawComputePipelineDescriptor, ShaderModuleDescriptor, ShaderStages,
+    TextureDimension, TextureFormat, TextureUsages,
+};
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use bevy_catppuccin::CatppuccinTheme;
 use bevy_pointer_to_world::{PointerToWorldCamera, PointerWorldPosition};
 use cell_particle::grid::{Dimensions, Grid};
@@ -9,7 +15,7 @@ use cell_particle::particle::{Particle, ParticleKind};
 use cell_particle::rule::{Input, Occupancy, Output, Rule};
 use percentage::Percentage;
 
-use crate::{CellRule, CellWorld, ParticleCell, Tool, ToolText, View, WorldTexture};
+use crate::{ActiveCells, CellRule, CellWorld, ParticleCell, Tool, ToolText, View, WorldTexture};
 #[cfg(feature = "debug")]
 use crate::{
     DebugMenu, DebugMenuState, ExistingParticleCountText, SpawnedParticleCountText, ToggleDebugMenu,
@@ -29,9 +35,6 @@ pub fn setup_environment(mut commands: Commands, theme: Res<CatppuccinTheme>) {
         },
         PointerToWorldCamera,
     ));
-
-    // World
-    commands.spawn(CellWorld::new(126, 70));
 }
 
 /// Bevy [`Startup`] system to setup the rules of the world
@@ -301,14 +304,55 @@ pub fn setup_view(
 }
 
 /// Bevy [`FixedUpdate`] system to update the grid
-pub fn grid_update(cell_rules: Query<&CellRule>, mut grid: Query<&mut CellWorld>) {
-    let Ok(mut cell_world) = grid.get_single_mut() else {
-        warn!("No cell world found");
+pub fn grid_update(
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    mut cell_worlds: Query<&mut CellWorld>,
+) {
+    let Ok(cell_world) = cell_worlds.get_single() else {
         return;
     };
 
-    let rules: Vec<_> = cell_rules.iter().map(|r| r.clone()).collect();
-    cell_world.update(&rules);
+    let (Some(pipeline), Some(bind_group), dimensions) = (
+        &cell_world.pipeline,
+        &cell_world.bind_group,
+        cell_world.dimensions.clone(),
+    ) else {
+        return;
+    };
+
+    // Create command encoder
+    let mut encoder = render_device.create_command_encoder(&CommandEncoderDescriptor {
+        label: Some("particle_update_encoder"),
+    });
+
+    {
+        let mut compute_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+            label: Some("particle_update_pass"),
+            ..default()
+        });
+
+        compute_pass.set_pipeline(pipeline);
+        compute_pass.set_bind_group(0, bind_group, &[]);
+
+        // Dispatch workgroups
+        let workgroup_count_x = (dimensions.width as f32 / 8.0).ceil() as u32;
+        let workgroup_count_y = (dimensions.height as f32 / 8.0).ceil() as u32;
+        compute_pass.dispatch_workgroups(workgroup_count_x, workgroup_count_y, 1);
+    }
+
+    // Submit command buffer
+    render_queue.submit(std::iter::once(encoder.finish()));
+
+    // Update buffers
+    let (input, output) = match (&cell_world.input_buffer, &cell_world.output_buffer) {
+        (Some(input), Some(output)) => (input.clone(), output.clone()),
+        _ => return,
+    };
+
+    let mut cell_world = cell_worlds.single_mut();
+    cell_world.input_buffer = Some(output);
+    cell_world.output_buffer = Some(input);
 }
 
 /// Bevy [`Update`] system to update the visualisation of the world
@@ -583,4 +627,146 @@ pub fn particle_count_text(
     if let Ok(mut existing_particle_count) = existing_particle_count.get_single_mut() {
         existing_particle_count.0 = format!("Existing: {}", stats.existing_particles);
     }
+}
+
+pub fn setup_compute_resources(
+    mut commands: Commands,
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    asset_server: Res<AssetServer>,
+) {
+    // Load compute shader
+    let shader = asset_server.load::<Shader>("shaders/particle_update.wgsl");
+    let shader_module = render_device.create_shader_module(ShaderModuleDescriptor {
+        label: Some("particle_shader"),
+        source: bevy::render::render_resource::ShaderSource::Wgsl(
+            include_str!("../../bevy_cells/assets/shaders/particle_update.wgsl").into(),
+        ),
+    });
+
+    // Create bind group layout entries
+    let bind_group_layout_entries = [
+        BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStages::COMPUTE,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: true },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+        BindGroupLayoutEntry {
+            binding: 1,
+            visibility: ShaderStages::COMPUTE,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: false },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+        BindGroupLayoutEntry {
+            binding: 2,
+            visibility: ShaderStages::COMPUTE,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        },
+    ];
+
+    // Create bind group layout
+    let bind_group_layout = render_device
+        .create_bind_group_layout("particle_bind_group_layout", &bind_group_layout_entries);
+
+    // Create pipeline layout
+    let pipeline_layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some("particle_pipeline_layout"),
+        bind_group_layouts: &[&bind_group_layout],
+        push_constant_ranges: &[],
+    });
+
+    // Create compute pipeline
+    let pipeline = render_device.create_compute_pipeline(&RawComputePipelineDescriptor {
+        label: Some("particle_pipeline"),
+        layout: Some(&pipeline_layout),
+        module: &shader_module,
+        entry_point: Some("update"),
+        cache: None,
+        compilation_options: Default::default(),
+    });
+
+    let width = 126;
+    let height = 70;
+    let grid_size = (width * height) as u64;
+
+    // Initialize empty grid
+    let grid = Grid::new(vec![vec![ParticleCell { content: None }; width]; height]).unwrap();
+
+    // Create initial buffer data (all zeros/empty)
+    let initial_data = vec![0u32; (width * height) as usize];
+
+    // Create buffers
+    let input_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("particle_input_buffer"),
+        size: grid_size * 4,
+        usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    // Write initial data to input buffer
+    render_queue.write_buffer(&input_buffer, 0, bytemuck::cast_slice(&initial_data));
+
+    let output_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("particle_output_buffer"),
+        size: grid_size * 4,
+        usage: BufferUsages::STORAGE | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let uniform_buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("dimensions_buffer"),
+        size: std::mem::size_of::<[u32; 2]>() as u64,
+        usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    // Write dimensions to uniform buffer
+    let dimensions_data = [width as u32, height as u32];
+    render_queue.write_buffer(&uniform_buffer, 0, bytemuck::cast_slice(&dimensions_data));
+
+    // Create bind group
+    let bind_group = render_device.create_bind_group(
+        "particle_bind_group",
+        &bind_group_layout,
+        &[
+            BindGroupEntry {
+                binding: 0,
+                resource: input_buffer.as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 1,
+                resource: output_buffer.as_entire_binding(),
+            },
+            BindGroupEntry {
+                binding: 2,
+                resource: uniform_buffer.as_entire_binding(),
+            },
+        ],
+    );
+
+    commands.spawn(CellWorld {
+        resolution: 10,
+        dimensions: Dimensions { width, height },
+        grid,
+        active_cells: ActiveCells::new(),
+        input_buffer: Some(input_buffer),
+        output_buffer: Some(output_buffer),
+        uniform_buffer: Some(uniform_buffer),
+        bind_group: Some(bind_group),
+        pipeline: Some(pipeline),
+    });
 }

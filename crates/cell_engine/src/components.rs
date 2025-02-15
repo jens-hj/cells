@@ -1,9 +1,12 @@
 use std::collections::HashSet;
 
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    render::render_resource::{BindGroup, Buffer, ComputePipeline},
+};
 use bevy_catppuccin::*;
 use cell_particle::{
-    grid::Grid,
+    grid::{Dimensions, Grid},
     particle::{self, Particle, ParticleKind},
     rule::{Occupancy, Rule},
 };
@@ -99,6 +102,12 @@ pub struct CellWorld {
     pub grid: Grid<ParticleCell>,
     /// The cells that are active in the current frame
     pub active_cells: ActiveCells,
+    pub dimensions: Dimensions,
+    pub input_buffer: Option<Buffer>,
+    pub output_buffer: Option<Buffer>,
+    pub uniform_buffer: Option<Buffer>,
+    pub bind_group: Option<BindGroup>,
+    pub pipeline: Option<ComputePipeline>,
 }
 
 impl CellWorld {
@@ -108,6 +117,12 @@ impl CellWorld {
             resolution: 10,
             grid,
             active_cells: ActiveCells::new(),
+            dimensions: Dimensions { width, height },
+            input_buffer: None,
+            output_buffer: None,
+            uniform_buffer: None,
+            bind_group: None,
+            pipeline: None,
         }
     }
 
